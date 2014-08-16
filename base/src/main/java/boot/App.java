@@ -13,17 +13,18 @@ import java.util.concurrent.Callable;
 import org.projectodd.shimdandy.ClojureRuntimeShim;
 
 public class App {
-    private static File[] podjars;
-    private static File   bootdir;
-    private static File   aetherfile;
+    private static File[]                  podjars    = null;
+    private static File                    bootdir    = null;
+    private static File                    aetherfile = null;
+    private static HashMap<String, File[]> depsCache  = null;
     
     private static final String appversion = "2.0.0";
     private static final String apprelease = "r1";
     private static final String depversion = appversion + "-SNAPSHOT";
     private static final String aetherjar  = "aether-" + depversion + "-standalone.jar";
 
-    public static ClojureRuntimeShim core;
-    public static ClojureRuntimeShim aether;
+    public static ClojureRuntimeShim core   = null;
+    public static ClojureRuntimeShim aether = null;
 
     public static ClojureRuntimeShim getCore()    { return core; }
     public static ClojureRuntimeShim getAether()  { return aether; }
@@ -37,17 +38,19 @@ public class App {
         out.close(); }
     
     public static HashMap<String, File[]> seedCache(ClojureRuntimeShim a) throws Exception {
-        if (a == null) {
-            ensureResourceFile(aetherjar, aetherfile);
-            a = newShim(new File[] { aetherfile }); }
+        if (depsCache != null) { return depsCache; }
+        else {
+            if (a == null) {
+                ensureResourceFile(aetherjar, aetherfile);
+                a = newShim(new File[] { aetherfile }); }
         
-        HashMap<String, File[]> cache = new HashMap<String, File[]>();
+            HashMap<String, File[]> cache = new HashMap<String, File[]>();
         
-        cache.put("boot/pod",    getDeps(a, "boot/pod"));
-        cache.put("boot/core",   getDeps(a, "boot/core"));
-        cache.put("boot/aether", getDeps(a, "boot/aether"));
+            cache.put("boot/pod",    getDeps(a, "boot/pod"));
+            cache.put("boot/core",   getDeps(a, "boot/core"));
+            cache.put("boot/aether", getDeps(a, "boot/aether"));
 
-        return cache; }
+            return depsCache = cache; }}
     
     public static Object readCache(File f) throws Exception {
         try {

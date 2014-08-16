@@ -134,28 +134,21 @@ public class App {
                 public Object call() throws Exception {
                     return newShim(cache.get("boot/core")); }});
         
-        final Thread t1 = (new Thread() {
-                public void run() {
-                    try {
-                        RandomAccessFile lf = new RandomAccessFile(lockfile, "rw");
-                        FileLock         ll = lf.getChannel().lock();
-                        writeCache(cachefile, seedCache((ClojureRuntimeShim) f1.get()));
-                        ll.release();
-                        lf.close(); }
-                    catch (Throwable e) { }}});
+        final Future f3 = ex.submit(new Callable() {
+                public Object call() throws Exception {
+                    RandomAccessFile lf = new RandomAccessFile(lockfile, "rw");
+                    FileLock         ll = lf.getChannel().lock();
+                    writeCache(cachefile, seedCache((ClojureRuntimeShim) f1.get()));
+                    ll.release();
+                    lf.close();
+                    return null; }});
         
-        t1.start();
-        
-        Runtime.getRuntime().addShutdownHook(new Thread() {
-                public void run() {
-                    try { t1.join(); }
-                    catch (Throwable e) { }}});
+        Thread shutdown = new Thread() { public void run() { ex.shutdown(); }};
+        Runtime.getRuntime().addShutdownHook(shutdown);
 
         aether = (ClojureRuntimeShim) f1.get();
         core   = (ClojureRuntimeShim) f2.get();
 
-        ex.shutdown();
-        
         core.require("boot.main");
         core.invoke("boot.main/-main", args);
         

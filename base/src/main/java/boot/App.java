@@ -47,14 +47,14 @@ public class App {
         
             HashMap<String, File[]> cache = new HashMap<String, File[]>();
         
-            cache.put("boot/pod",    getDeps(a, "boot/pod"));
-            cache.put("boot/core",   getDeps(a, "boot/core"));
-            cache.put("boot/aether", getDeps(a, "boot/aether"));
+            cache.put("boot/pod",    resolveDepJars(a, "boot/pod"));
+            cache.put("boot/core",   resolveDepJars(a, "boot/core"));
+            cache.put("boot/aether", resolveDepJars(a, "boot/aether"));
 
             return depsCache = cache; }}
     
     private static Object
-    validate(Object cache) throws Exception {
+    validateCache(Object cache) throws Exception {
         for (File[] fs : ((HashMap<String, File[]>) cache).values())
             for (File f : fs)
                 if (! f.exists()) throw new Exception("dep jar doesn't exist");
@@ -74,7 +74,7 @@ public class App {
             long     max  = 18 * 60 * 60 * 1000;
             long     age  = System.currentTimeMillis() - f.lastModified();
             if (age > max) throw new Exception("cache age exceeds TTL");
-            return validate((new ObjectInputStream(new FileInputStream(f))).readObject()); }
+            return validateCache((new ObjectInputStream(new FileInputStream(f))).readObject()); }
         catch (Throwable e) { return seedCache(null); }
         finally { lock.release(); }}
     
@@ -120,7 +120,7 @@ public class App {
         if (! f.exists()) extractResource(r, f); }
     
     public static File[]
-    getDeps(ClojureRuntimeShim shim, String sym) {
+    resolveDepJars(ClojureRuntimeShim shim, String sym) {
         shim.require("boot.aether");
         return (File[]) shim.invoke("boot.aether/resolve-dependency-jars", sym, depversion); }
     

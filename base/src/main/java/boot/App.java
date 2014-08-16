@@ -37,7 +37,7 @@ public class App {
         File lockfile = new File(f.getPath() + ".lock");
         return (new RandomAccessFile(lockfile, "rw")).getChannel().lock(); }
 
-    public static HashMap<String, File[]>
+    private static HashMap<String, File[]>
     seedCache(ClojureRuntimeShim a) throws Exception {
         if (depsCache != null) return depsCache;
         else {
@@ -53,21 +53,28 @@ public class App {
 
             return depsCache = cache; }}
     
-    public static void
+    private static Object
+    validate(Object cache) throws Exception {
+        for (File[] fs : ((HashMap<String, File[]>) cache).values())
+            for (File f : fs)
+                if (! f.exists()) throw new Exception("dep jar doesn't exist");
+        return cache; }
+
+    private static void
     writeCache(File f, Object m) throws Exception {
         FileLock         lock = getLock(f);
         FileOutputStream file = new FileOutputStream(f);
         try { (new ObjectOutputStream(file)).writeObject(m); }
         finally { file.close(); lock.release(); }}
     
-    public static Object
+    private static Object
     readCache(File f) throws Exception {
         FileLock lock = getLock(f);
         try {
             long     max  = 18 * 60 * 60 * 1000;
             long     age  = System.currentTimeMillis() - f.lastModified();
             if (age > max) throw new Exception("cache age exceeds TTL");
-            return (new ObjectInputStream(new FileInputStream(f))).readObject(); }
+            return validate((new ObjectInputStream(new FileInputStream(f))).readObject()); }
         catch (Throwable e) { return seedCache(null); }
         finally { lock.release(); }}
     

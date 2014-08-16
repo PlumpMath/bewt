@@ -56,6 +56,9 @@
          `(core/boot ~@argv*))
        `(when-let [main# (resolve '~'-main)] (main# ~@argv)))))
 
+(defn default-task []
+  (fn [continue] (fn [event] (prn event) (continue event))))
+
 (defn -main [[arg0 & args :as args*]]
   (let [dotboot?           #(.endsWith (.getName (io/file %)) ".boot")
         script?            #(when (and % (.isFile (io/file %)) (dotboot? %)) %)
@@ -67,7 +70,7 @@
 
     (when (:freshen    opts) (core/set-update! :always))
     (when (:no-freshen opts) (core/set-update! :never))
-    (core/set-offline! (:offline opts))
+    (when (:offline    opts) (core/set-offline! true))
     
     (binding [*out* (util/auto-flush *out*)
               *err* (util/auto-flush *err*)]
@@ -91,7 +94,13 @@
               scriptstr   (str (string/join "\n\n" (map util/pp-str scriptforms)) "\n")]
           (when (:script  opts) (util/exit-ok (print scriptstr)))
           (when (:version opts) (util/exit-ok (println boot-version)))
-          (prn {:boot-version boot-version
-                :boot-options opts
-                :default-task 'boot.task.core/help})
+          (#'core/init!
+            :boot-version boot-version
+            :boot-options opts
+            :default-task 'boot.main/default-task)
+          (let [tmpd (core/mktmpdir! ::bootscript)
+                file #(doto (apply io/file %&) io/make-parents)
+                tmpf (.getPath (file tmpd "boot" "user.clj"))]
+            (core/set-env! :boot-user-ns-file tmpf)
+            (doto tmpf (spit scriptstr) (load-file)))
           )))))

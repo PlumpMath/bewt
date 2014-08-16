@@ -10,7 +10,7 @@
    )
   )
 
-(def boot-version "2.0.0")
+(def boot-version (str (boot.App/getVersion) "-" (boot.App/getRelease)))
 
 (defn read-cli [argv]
   (let [src (str "(" (string/join " " argv) "\n)")]
@@ -60,6 +60,7 @@
   (let [dotboot?           #(.endsWith (.getName (io/file %)) ".boot")
         script?            #(when (and % (.isFile (io/file %)) (dotboot? %)) %)
         [errs opts args**] (parse-cli-opts (if (script? arg0) args args*))]
+    
     (when (seq errs)
       (util/exit-error
         (println (apply str (interpose "\n" errs)))))

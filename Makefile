@@ -1,5 +1,6 @@
 
 all:
+	mkdir -p base/src/main/resources
 	(cd pod; lein install)
 	(cd aether; lein install; lein uberjar; cp target/aether-*-standalone.jar ../base/src/main/resources)
 	(cd core; lein install)

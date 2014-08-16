@@ -32,11 +32,13 @@ public class App {
     public static String             getVersion() { return appversion; }
     public static String             getRelease() { return apprelease; }
     
-    private static FileLock getLock(File f) throws Exception {
+    private static FileLock
+    getLock(File f) throws Exception {
         File lockfile = new File(f.getPath() + ".lock");
         return (new RandomAccessFile(lockfile, "rw")).getChannel().lock(); }
 
-    public static HashMap<String, File[]> seedCache(ClojureRuntimeShim a) throws Exception {
+    public static HashMap<String, File[]>
+    seedCache(ClojureRuntimeShim a) throws Exception {
         if (depsCache != null) return depsCache;
         else {
             if (a == null) {
@@ -51,13 +53,15 @@ public class App {
 
             return depsCache = cache; }}
     
-    public static void writeCache(File f, Object m) throws Exception {
+    public static void
+    writeCache(File f, Object m) throws Exception {
         FileLock         lock = getLock(f);
         FileOutputStream file = new FileOutputStream(f);
         try { (new ObjectOutputStream(file)).writeObject(m); }
         finally { file.close(); lock.release(); }}
     
-    public static Object readCache(File f) throws Exception {
+    public static Object
+    readCache(File f) throws Exception {
         FileLock lock = getLock(f);
         try {
             long     max  = 18 * 60 * 60 * 1000;
@@ -67,7 +71,8 @@ public class App {
         catch (Throwable e) { return seedCache(null); }
         finally { lock.release(); }}
     
-    public static ClojureRuntimeShim newShim(File[] jarFiles) throws Exception {
+    public static ClojureRuntimeShim
+    newShim(File[] jarFiles) throws Exception {
         URL[] urls = new URL[jarFiles.length];
         
         for (int i=0; i<jarFiles.length; i++) urls[i] = jarFiles[i].toURI().toURL();
@@ -80,10 +85,11 @@ public class App {
 
         return rt; }
     
-    public static ClojureRuntimeShim newPod() throws Exception {
-        return newShim(podjars); }
+    public static ClojureRuntimeShim
+    newPod() throws Exception { return newShim(podjars); }
     
-    public static ClojureRuntimeShim newPod(File[] jarFiles) throws Exception {
+    public static ClojureRuntimeShim
+    newPod(File[] jarFiles) throws Exception {
         File[] files = new File[jarFiles.length + podjars.length];
         
         for (int i=0; i<podjars.length; i++) files[i] = podjars[i];
@@ -91,7 +97,8 @@ public class App {
         
         return newShim(files); }
     
-    public static void extractResource(String resource, File outfile) throws Exception {
+    public static void
+    extractResource(String resource, File outfile) throws Exception {
         ClassLoader  cl  = Thread.currentThread().getContextClassLoader();
         InputStream  in  = cl.getResourceAsStream(resource);
         OutputStream out = new FileOutputStream(outfile);
@@ -101,14 +108,17 @@ public class App {
         try { while ((n = in.read(buf)) > 0) out.write(buf, 0, n); }
         finally { in.close(); out.close(); }}
     
-    public static void ensureResourceFile(String r, File f) throws Exception {
+    public static void
+    ensureResourceFile(String r, File f) throws Exception {
         if (! f.exists()) extractResource(r, f); }
     
-    public static File[] getDeps(ClojureRuntimeShim shim, String sym) {
+    public static File[]
+    getDeps(ClojureRuntimeShim shim, String sym) {
         shim.require("boot.aether");
         return (File[]) shim.invoke("boot.aether/resolve-dependency-jars", sym, depversion); }
     
-    public static void main(String[] args) throws Exception {
+    public static void
+    main(String[] args) throws Exception {
         File homedir = new File(System.getProperty("user.home"));
         bootdir      = new File(homedir, ".boot");
         File jardir  = new File(new File(bootdir, "lib"), apprelease);

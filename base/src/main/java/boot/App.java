@@ -125,7 +125,7 @@ public class App {
         return (File[]) shim.invoke("boot.aether/resolve-dependency-jars", sym, depversion); }
     
     public static void
-    init() throws Exception {
+    main(String[] args) throws Exception {
         File homedir = new File(System.getProperty("user.home"));
         bootdir      = new File(homedir, ".boot");
         File jardir  = new File(new File(bootdir, "lib"), apprelease);
@@ -160,11 +160,9 @@ public class App {
         Runtime.getRuntime().addShutdownHook(shutdown);
 
         aether = (ClojureRuntimeShim) f1.get();
-        core   = (ClojureRuntimeShim) f2.get(); }
+        core   = (ClojureRuntimeShim) f2.get();
 
-    public static void
-    main(String[] args) throws Exception {
-        init();
         core.require("boot.main");
         core.invoke("boot.main/-main", args);
+        
         System.exit(0); }}

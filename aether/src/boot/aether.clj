@@ -10,9 +10,6 @@
 (def offline? (atom false))
 (def update?  (atom :daily))
 
-(defn set-offline! [x] (reset! offline? (read-string x)))
-(defn set-update!  [x] (reset! update? (read-string x)))
-
 (defn default-repositories
   []
   [["clojars"       "http://clojars.org/repo/"]

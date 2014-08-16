@@ -1,30 +1,16 @@
 package boot;
 
-import java.io.File;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.RandomAccessFile;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.*;
 import java.nio.channels.FileLock;
 import java.nio.channels.FileChannel;
-
 import java.net.URL;
 import java.net.URLClassLoader;
-
-import org.projectodd.shimdandy.ClojureRuntimeShim;
-
 import java.util.HashMap;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Callable;
+import org.projectodd.shimdandy.ClojureRuntimeShim;
 
 public class App {
     private static File[] podjars;
@@ -65,8 +51,8 @@ public class App {
     
     public static Object readCache(File f) throws Exception {
         try {
-            long age = System.currentTimeMillis() - f.lastModified();
             long max = 18 * 60 * 60 * 1000;
+            long age = System.currentTimeMillis() - f.lastModified();
             if (age > max) throw new Exception("cache age exceeds TTL");
             return (new ObjectInputStream(new FileInputStream(f))).readObject(); }
         catch (Throwable e) { return seedCache(null); }}
@@ -112,22 +98,13 @@ public class App {
         shim.require("boot.aether");
         return (File[]) shim.invoke("boot.aether/resolve-dependency-jars", sym, depversion); }
     
-    public static void setOffline(String x) throws Exception {
-        aether.require("boot.aether");
-        aether.invoke("boot.aether/set-offline!", x); }
-    
-    public static void setUpdate(String x) throws Exception {
-        aether.require("boot.aether");
-        aether.invoke("boot.aether/set-update!", x); }
-    
     public static void main(String[] args) throws Exception {
-        File homedir    = new File(System.getProperty("user.home"));
-        bootdir         = new File(homedir, ".boot");
-        File reldir     = new File(bootdir, "lib");
-        File jardir     = new File(reldir, apprelease);
-        aetherfile      = new File(jardir, aetherjar);
+        File homedir = new File(System.getProperty("user.home"));
+        bootdir      = new File(homedir, ".boot");
+        File jardir  = new File(new File(bootdir, "lib"), apprelease);
+        aetherfile   = new File(jardir, aetherjar);
         
-        final File cachedir  = new File(bootdir, "cache");
+        final File cachedir  = new File(new File(bootdir, "cache"), apprelease);
         final File cachefile = new File(cachedir, "deps.cache");
         final File lockfile  = new File(cachedir, "deps.lock");
         
@@ -171,8 +148,8 @@ public class App {
                     try { t1.join(); }
                     catch (Throwable e) { }}});
 
-        aether  = (ClojureRuntimeShim) f1.get();
-        core    = (ClojureRuntimeShim) f2.get();
+        aether = (ClojureRuntimeShim) f1.get();
+        core   = (ClojureRuntimeShim) f2.get();
 
         ex.shutdown();
         

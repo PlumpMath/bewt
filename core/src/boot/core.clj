@@ -1,10 +1,18 @@
-(ns boot.core)
+(ns boot.core
+  (:require
+   [boot.pod :as pod]
+   )
+  )
 
 (defn set-offline! [x]
-  (boot.App/setOffline (pr-str x)))
+  (pod/eval-in (boot.App/getAether)
+    `(do (require '~'boot.aether)
+         (reset! boot.aether/offline? ~x))))
 
 (defn set-update! [x]
-  (boot.App/setUpdate (pr-str x)))
+  (pod/eval-in (boot.App/getAether)
+    `(do (require '~'boot.aether)
+         (reset! boot.aether/update? ~x))))
 
 (defn foo
   "I don't do a whole lot."

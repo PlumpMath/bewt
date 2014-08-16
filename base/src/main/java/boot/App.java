@@ -136,7 +136,7 @@ public class App {
                     try {
                         RandomAccessFile lf = new RandomAccessFile(lockfile, "rw");
                         FileLock         ll = lf.getChannel().lock();
-                        writeCache(cachefile, (HashMap<String, File[]>) seedCache((ClojureRuntimeShim) f1.get()));
+                        writeCache(cachefile, seedCache((ClojureRuntimeShim) f1.get()));
                         ll.release();
                         lf.close(); }
                     catch (Throwable e) { }}});

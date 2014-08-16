@@ -32,13 +32,12 @@ public class App {
     public static String             getVersion() { return appversion; }
     public static String             getRelease() { return apprelease; }
     
-    public static void writeCache(File f, Object m) throws Exception {
-        FileOutputStream out = new FileOutputStream(f);
-        (new ObjectOutputStream(out)).writeObject(m);
-        out.close(); }
-    
+    private static FileLock getLock(File f) throws Exception {
+        File lockfile = new File(f.getPath() + ".lock");
+        return (new RandomAccessFile(lockfile, "rw")).getChannel().lock(); }
+
     public static HashMap<String, File[]> seedCache(ClojureRuntimeShim a) throws Exception {
-        if (depsCache != null) { return depsCache; }
+        if (depsCache != null) return depsCache;
         else {
             if (a == null) {
                 ensureResourceFile(aetherjar, aetherfile);
@@ -52,13 +51,21 @@ public class App {
 
             return depsCache = cache; }}
     
+    public static void writeCache(File f, Object m) throws Exception {
+        FileLock         lock = getLock(f);
+        FileOutputStream file = new FileOutputStream(f);
+        try { (new ObjectOutputStream(file)).writeObject(m); }
+        finally { file.close(); lock.release(); }}
+    
     public static Object readCache(File f) throws Exception {
+        FileLock lock = getLock(f);
         try {
-            long max = 18 * 60 * 60 * 1000;
-            long age = System.currentTimeMillis() - f.lastModified();
+            long     max  = 18 * 60 * 60 * 1000;
+            long     age  = System.currentTimeMillis() - f.lastModified();
             if (age > max) throw new Exception("cache age exceeds TTL");
             return (new ObjectInputStream(new FileInputStream(f))).readObject(); }
-        catch (Throwable e) { return seedCache(null); }}
+        catch (Throwable e) { return seedCache(null); }
+        finally { lock.release(); }}
     
     public static ClojureRuntimeShim newShim(File[] jarFiles) throws Exception {
         URL[] urls = new URL[jarFiles.length];
@@ -109,18 +116,11 @@ public class App {
         
         final File cachedir  = new File(new File(bootdir, "cache"), apprelease);
         final File cachefile = new File(cachedir, "deps.cache");
-        final File lockfile  = new File(cachedir, "deps.lock");
         
         jardir.mkdirs();
         cachedir.mkdirs();
         
-        RandomAccessFile lf = new RandomAccessFile(lockfile, "rw");
-        FileLock         ll = lf.getChannel().lock();
-
         final HashMap<String, File[]> cache = (HashMap<String, File[]>) readCache(cachefile);
-
-        ll.release();
-        lf.close();
 
         podjars = cache.get("boot/pod");
         
@@ -136,11 +136,7 @@ public class App {
         
         final Future f3 = ex.submit(new Callable() {
                 public Object call() throws Exception {
-                    RandomAccessFile lf = new RandomAccessFile(lockfile, "rw");
-                    FileLock         ll = lf.getChannel().lock();
                     writeCache(cachefile, seedCache((ClojureRuntimeShim) f1.get()));
-                    ll.release();
-                    lf.close();
                     return null; }});
         
         Thread shutdown = new Thread() { public void run() { ex.shutdown(); }};

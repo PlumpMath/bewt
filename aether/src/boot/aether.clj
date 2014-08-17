@@ -64,7 +64,7 @@
     :offline?           (or @offline? (:offline? env))
     :mirrors            (:mirrors env)
     :proxy              (or (:proxy env) (get-proxy-settings))
-    :transfer-listener  (or (:transfer-listener env) transfer-listener)))
+    :transfer-listener  transfer-listener))
 
 (def resolve-dependencies-memoized*
   (memoize
@@ -82,7 +82,7 @@
 
 (defn resolve-dependencies
   [env]
-  (->> [:dependencies :repositories :local-repo :offline? :mirrors :proxy :transfer-listener]
+  (->> [:dependencies :repositories :local-repo :offline? :mirrors :proxy]
     (select-keys env)
     resolve-dependencies-memoized*))
 

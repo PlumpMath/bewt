@@ -71,11 +71,13 @@ public class App {
     readCache(File f) throws Exception {
         FileLock lock = getLock(f);
         try {
-            long     max  = 18 * 60 * 60 * 1000;
-            long     age  = System.currentTimeMillis() - f.lastModified();
+            long max = 18 * 60 * 60 * 1000;
+            long age = System.currentTimeMillis() - f.lastModified();
             if (age > max) throw new Exception("cache age exceeds TTL");
             return validateCache((new ObjectInputStream(new FileInputStream(f))).readObject()); }
-        catch (Throwable e) { return seedCache(null); }
+        catch (Throwable e) {
+            System.err.println("boot: updating dependencies...");
+            return seedCache(null); }
         finally { lock.release(); }}
     
     public static ClojureRuntimeShim

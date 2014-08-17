@@ -73,13 +73,22 @@
 ;;
 ;; These tasks are included in boot core and are listed by the `help` task.
 
-(core/deftask debug
+(core/deftask debug-env
   "Print the value of a boot environment key.
 
   Multiple `keys` specify a path, similar to `#'clojure.core/get-in`."
   [& keys]
   (core/with-pre-wrap
     (let [e (core/get-env)]
+      (print (pp-str (if-not (seq keys) e (get-in e keys)))))))
+
+(core/deftask debug-event
+  "Print the value of a boot event key.
+
+  Multiple `keys` specify a path, similar to `#'clojure.core/get-in`."
+  [& keys]
+  (core/with-pre-wrap
+    (let [e core/*event*]
       (print (pp-str (if-not (seq keys) e (get-in e keys)))))))
 
 (core/deftask help

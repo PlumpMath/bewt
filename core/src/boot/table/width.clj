@@ -24,7 +24,7 @@
 ;;; OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 ;;; WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ;;; 
-(ns tailrecursion.boot.table.width
+(ns boot.table.width
   (:require clojure.java.shell clojure.java.io clojure.string))
 
 (declare get-initial-widths max-width-per-field actual-width auto-resize-widths

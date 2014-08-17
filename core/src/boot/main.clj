@@ -4,11 +4,11 @@
    [boot.pod           :as pod]
    [boot.core          :as core]
    [boot.util          :as util]
+   [boot.gitignore     :as git]
+   [boot.tmpregistry   :as tmp]
    [clojure.java.io    :as io]
    [clojure.stacktrace :as trace]
-   [clojure.string     :as string]
-   )
-  )
+   [clojure.string     :as string]))
 
 (def boot-version (str (boot.App/getVersion) "-" (boot.App/getRelease)))
 
@@ -24,7 +24,7 @@
          (or (seq (map ->expr (or (seq (read-cli argv)) dfltsk))) dfltsk))
     (catch Throwable e (with-out-str (trace/print-cause-trace e)))))
 
-(def ^:private cli-opts
+(def cli-opts
   [["-f" "--freshen"    "Force snapshot dependency updates."]
    ["-F" "--no-freshen" "Don't update snapshot dependencies."]
    ["-h" "--help"       "Print basic usage and help info."]
@@ -41,6 +41,7 @@
   `(~'(ns boot.user
         (:require
          [boot.util :refer :all]
+         [boot.task.built-in :refer :all]
          [boot.core :refer :all :exclude [deftask]]))
     (defmacro ~'deftask
       [~'& ~'args]
@@ -55,9 +56,6 @@
             (System/exit 1))
          `(core/boot ~@argv*))
        `(when-let [main# (resolve '~'-main)] (main# ~@argv)))))
-
-(defn default-task []
-  (fn [continue] (fn [event] (prn event) (continue event))))
 
 (defn -main [[arg0 & args :as args*]]
   (let [dotboot?           #(.endsWith (.getName (io/file %)) ".boot")
@@ -92,15 +90,20 @@
               commented   (concat () userforms [`(comment "script")] bootforms)
               scriptforms (emit boot? args args* ex commented)
               scriptstr   (str (string/join "\n\n" (map util/pp-str scriptforms)) "\n")]
+
           (when (:script  opts) (util/exit-ok (print scriptstr)))
           (when (:version opts) (util/exit-ok (println boot-version)))
+
+          (reset! (var-get #'core/gitignore) (git/make-gitignore-matcher))
+          (reset! (var-get #'core/tmpregistry) (tmp/init! (tmp/registry (io/file ".boot" "tmp"))))
+
           (#'core/init!
             :boot-version boot-version
             :boot-options opts
-            :default-task 'boot.main/default-task)
+            :default-task 'boot.task.built-in/help)
+
           (let [tmpd (core/mktmpdir! ::bootscript)
                 file #(doto (apply io/file %&) io/make-parents)
                 tmpf (.getPath (file tmpd "boot" "user.clj"))]
             (core/set-env! :boot-user-ns-file tmpf)
-            (doto tmpf (spit scriptstr) (load-file)))
-          )))))
+            (doto tmpf (spit scriptstr) (load-file))))))))

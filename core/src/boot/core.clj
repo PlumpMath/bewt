@@ -6,7 +6,6 @@
    [clojure.walk     :as walk]
    [boot.pod         :as pod]
    [boot.file        :as file]
-   [boot.gitignore   :as git]
    [boot.tmpregistry :as tmp]
    [boot.util        :refer :all])
   (:import
@@ -19,10 +18,8 @@
 ;;
 ;; _These functions are used internally by boot and are not part of the public API._
 
-(defn- tmpreg
-  "Get the tempfile registry object for the current boot environment."
-  []
-  (get-in @boot-env [:system :tmpregistry]))
+(def ^:private tmpregistry  (atom nil))
+(def ^:private gitignore    (atom nil))
 
 #_(defn- get-deps []
   (require 'tailrecursion.boot.deps)
@@ -31,21 +28,13 @@
 (defn- add-dependencies!
   "Add Maven dependencies to the classpath, fetching them if necessary."
   [old new env]
-  #_(require 'tailrecursion.boot.loader)
-  #_(let [deps (resolve 'tailrecursion.boot.loader/dependencies)
-        add! (resolve 'tailrecursion.boot.loader/add-dependencies!)]
-    (add! new (:repositories env))
-    (into (or old []) new)))
+  (pod/add-dependencies (assoc env :dependencies new))
+  (into (or old []) new))
 
 (defn- add-directories!
   "Add URLs (directories or JAR files) to the classpath."
   [dirs]
-  (when (seq dirs)
-    (let [meth  (doto (.getDeclaredMethod URLClassLoader "addURL" (into-array Class [URL]))
-                  (.setAccessible true))
-          cldr  (ClassLoader/getSystemClassLoader)
-          urls  (->> dirs (map io/file) (filter #(.exists %)) (map #(.. % toURI toURL)))]
-      (doseq [url urls] (.invoke meth cldr (object-array [url]))))))
+  (doseq [dir dirs] (pod/add-classpath dir)))
 
 (defn- configure!*
   "Performs side-effects associated with changes to the env atom. Boot adds this
@@ -59,51 +48,16 @@
 (def ^:private base-env
   "Returns initial boot environment settings."
   (fn []
-    {:project       nil
-     :version       nil
-     :description   nil
-     :license       nil
-     :url           nil
-     :boot-version  nil
-     :dependencies  []
-     :out-path      "out"
-     :src-paths     #{}
-     :src-static    #{}
-     :repositories  #{"http://clojars.org/repo/"
-                      "http://repo1.maven.org/maven2/"}
-     :test          "test"
-     :target        "target"
-     :resources     "resources"
-     :public        "resources/public"
-     :system        {:cwd         (io/file (System/getProperty "user.dir"))
-                     :home        (io/file (System/getProperty "user.home"))
-                     :jvm-opts    (vec (.. ManagementFactory getRuntimeMXBean getInputArguments))
-                     :tmpregistry (tmp/init! (tmp/registry (io/file ".boot" "tmp")))
-                     :gitignore   (git/make-gitignore-matcher)}}))
+    '{:dependencies [[org.clojure/clojure "1.6.0"]]
+      :src-paths    #{}
+      :out-path     "out"
+      :repositories [["clojars"       "http://clojars.org/repo/"]
+                     ["maven-central" "http://repo1.maven.org/maven2/"]]}))
 
 ;; ## Boot Environment
 ;;
 ;; _These functions are used internally by boot and are not part of the public
 ;; API._
-
-(defn set-offline!
-  "Set/unset offline mode for dependency resolution."
-  [x]
-  (pod/eval-in (boot.App/getAether)
-    `(do (require '~'boot.aether)
-         (reset! boot.aether/offline? ~x))))
-
-(defn set-update!
-  "Set the snapshot update frequency for dependency resolution. Accepted values
-  of x are `:always`, `:daily`, or `:never`."
-  [x]
-  (pod/eval-in (boot.App/getAether)
-    `(do (require '~'boot.aether)
-         (reset! boot.aether/update? ~x))))
-
-(def ^:dynamic *opts*
-  "Command line options are bound to this var."
-  {})
 
 (def boot-env
   "Atom containing environment key/value pairs. Do not manipulate this atom
@@ -129,8 +83,8 @@
   the new directories to the classpath."
   (fn [key old-value new-value env] key) :default ::default)
 
-(defmethod on-env! ::default     [key old new env] nil)
-(defmethod on-env! :src-paths    [key old new env] (add-directories! (set/difference new old)))
+(defmethod on-env! ::default  [key old new env] nil)
+(defmethod on-env! :src-paths [key old new env] (add-directories! (set/difference new old)))
 
 (defmulti merge-env!
   "This function is used to modify how new values are merged into the boot atom
@@ -138,15 +92,28 @@
   associated with the given `key` in the boot atom."
   (fn [key old-value new-value env] key) :default ::default)
 
-(defmethod merge-env! ::default      [key old new env] new)
-(defmethod merge-env! :repositories  [key old new env] (into (or old #{}) new))
-(defmethod merge-env! :src-static    [key old new env] (into (or old #{}) new))
-(defmethod merge-env! :src-paths     [key old new env] (into (or old #{}) new))
-(defmethod merge-env! :dependencies  [key old new env] (add-dependencies! old new env))
+(defmethod merge-env! ::default     [key old new env] new)
+(defmethod merge-env! :src-paths    [key old new env] (into (or old #{}) new))
+(defmethod merge-env! :dependencies [key old new env] (add-dependencies! old new env))
 
 ;; ## Boot API Functions
 ;;
 ;; _Functions provided for use in boot tasks._
+
+(defn set-offline!
+  "Set/unset offline mode for dependency resolution."
+  [x]
+  (pod/eval-in (boot.App/getAether)
+    `(do (require '~'boot.aether)
+         (reset! boot.aether/offline? ~x))))
+
+(defn set-update!
+  "Set the snapshot update frequency for dependency resolution. Accepted values
+  of x are `:always`, `:daily`, or `:never`."
+  [x]
+  (pod/eval-in (boot.App/getAether)
+    `(do (require '~'boot.aether)
+         (reset! boot.aether/update? ~x))))
 
 (defn set-env!
   "Update the boot environment atom `this` with the given key-value pairs given
@@ -174,7 +141,7 @@
     (do (add-sync! bar [baz]) (add-sync! bar [baf]))
   "
   [dst & [srcs]]
-  (tmp/add-sync! (tmpreg) dst srcs))
+  (tmp/add-sync! @tmpregistry dst srcs))
 
 (def ^:private src-filters (atom []))
 
@@ -211,19 +178,19 @@
            deletes  (set/difference outfiles (set keepers))]
        (when (seq keepers)
          (doseq [f deletes] (.delete f))
-         (tmp/sync! (tmpreg)))))
+         (tmp/sync! @tmpregistry))))
   ([dest & srcs]
      (apply file/sync :hash dest srcs)))
 
 (defn ignored?
   "Returns truthy if the file f is ignored in the user's gitignore config."
   [f]
-  ((get-in @boot-env [:system :gitignore]) f))
+  (@gitignore f))
 
 (defn tmpfile?
   "Returns truthy if the file f is a tmpfile managed by the tmpregistry."
   [f]
-  (tmp/tmpfile? (tmpreg) f))
+  (tmp/tmpfile? @tmpregistry f))
 
 (defn mktmp!
   "Create a temp file and return its `File` object. If `mktmp!` has already 
@@ -231,7 +198,7 @@
   `name` argument can be used to customize the temp file name (useful for
   creating temp files with a specific file extension, for example)."
   [key & [name]]
-  (tmp/mk! (tmpreg) key name))
+  (tmp/mk! @tmpregistry key name))
 
 (defn mktmpdir!
   "Create a temp directory and return its `File` object. If `mktmpdir!` has
@@ -239,7 +206,7 @@
   deleted. The optional `name` argument can be used to customize the temp
   directory name, as with `mktmp!` above."
   [key & [name]]
-  (tmp/mkdir! (tmpreg) key name))
+  (tmp/mkdir! @tmpregistry key name))
 
 (def outdirs
   "Atom containing a vector of File objects--directories created by `mkoutdir!`.
@@ -272,7 +239,7 @@
 (defn unmk!
   "Delete the temp/out file or directory created with the given `key`."
   [key]
-  (tmp/unmk! (tmpreg) key))
+  (tmp/unmk! @tmpregistry key))
 
 (defn out-files
   "Returns a seq of `java.io.File` objects--the contents of directories created

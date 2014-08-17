@@ -2,3 +2,4 @@ target/
 *.jar
 /boot
 zzz/
+.lein-*

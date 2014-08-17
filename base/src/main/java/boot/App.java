@@ -128,8 +128,12 @@ public class App {
     
     public static void
     main(String[] args) throws Exception {
-        File homedir = new File(System.getProperty("user.home"));
-        bootdir      = new File(homedir, ".boot");
+        String bhome = System.getenv("BOOT_HOME");
+        String homed = System.getProperty("user.home");
+        
+        if (bhome != null) bootdir = new File(bhome);
+        else bootdir = new File(new File(homed), ".boot");
+
         File jardir  = new File(new File(bootdir, "lib"), apprelease);
         aetherfile   = new File(jardir, aetherjar);
         
